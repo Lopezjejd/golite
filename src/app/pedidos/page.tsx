@@ -1,7 +1,8 @@
 import Link from "next/link";
-
-export default function PedidosPage()  {
-
+import { getPedidos } from "@/lib/pedidos";
+import PedidoCard from "@/components/PedidoCard";
+export default async function PedidosPage()  {
+const pedidos = await getPedidos(); // Asegúrate de que getPedidos es una función asíncrona que devuelve una promesa
 
 return (
     <div className="p-4">
@@ -10,9 +11,7 @@ return (
   <ul>
     {pedidos.map((pedido) => (
         <li key={pedido.id} className="mb-2">
-            <Link href={`/pedidos/${pedido.id}`} className="text-blue-500 hover:underline">
-                Pedido #{pedido.id} - Mesa {pedido.mesa} - Total: ${pedido.total.toFixed(2)} - Estado: {pedido.estado}
-            </Link>
+         <PedidoCard pedido={pedido} />
         </li>
     )
     )}
