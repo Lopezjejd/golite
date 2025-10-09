@@ -1,42 +1,50 @@
 // src/lib/pedidos.ts
 /**
- * Tipos y store en memoria para el manager del restaurante.
- * - Items NO tienen cantidad; duplicar un item equivale a pedir más unidades.
- * - Cada item tiene su propio estado (ej: "pendiente" o "entregado").
+ * Store / helpers para órdenes (restaurant manager).
+ * - Items NO tienen cantidad; duplicar un item = más unidades.
+ * - Cada Item tiene su propio estado y su propio id (para identificarlo sin depender de índices).
  *
- * Nota: este módulo usa almacenamiento en memoria (PEDIDOS). Reiniciar el servidor borra todo.
+ * Nota: almacenamiento en memoria (dev). Reiniciar el servidor borra todo.
  */
+
+/* ------------------------------ Tipos ------------------------------ */
 
 /** Estado posible por item */
 export type Estado = "pendiente" | "entregado";
 
-/** Item en una orden (sin cantidad; duplicados = multiplicidad) */
+/** Item dentro de una orden */
 export type Item = {
+  id: string;         // id único del item (string)
   nombre: string;
   precio: number;
-  nota?: string;   // "sin cebolla", "bien cocida", etc.
-  estado: Estado;  // cada item puede avanzar independiente
+  nota?: string;      // ej: "sin cebolla"
+  estado: Estado;     // "pendiente" | "entregado"
 };
 
-/** Pedido/Orden de mesa */
-export type Pedido = {
+/** Pedido / Orden */
+export type Pedido = { 
   id: string;
   mesa: string;
   mesero?: string;
-  total: number;   // suma de precios de items
-  items: Item[];   // **requerido**: array (mejor evitar `items?`)
-  creadoEn: string;
+  total: number;      // suma de precios de items
+  items: Item[];      // NO opcional: siempre un array
+  creadoEn: string;   // ISO timestamp
 };
 
-/** STORE EN MEMORIA — datos de ejemplo */
+/* ------------------------------ STORE en memoria (ejemplos) ------------------------------ */
+
+/**
+ * Datos de ejemplo para desarrollo.
+ * En production reemplazar por una DB (Postgres, SQLite, Mongo, etc.)
+ */
 const PEDIDOS: Pedido[] = [
   {
     id: "1",
     mesa: "Mesa 1",
     mesero: "Juan",
     items: [
-      { nombre: "Hamburguesa", precio: 12000, estado: "pendiente" },
-      { nombre: "Papas fritas", precio: 8000, estado: "pendiente" }
+      { id: "i-1", nombre: "Hamburguesa", precio: 12000, estado: "pendiente" },
+      { id: "i-2", nombre: "Papas fritas", precio: 8000, estado: "pendiente" }
     ],
     total: 20000,
     creadoEn: new Date().toISOString()
@@ -46,47 +54,73 @@ const PEDIDOS: Pedido[] = [
     mesa: "Mesa 2",
     mesero: "Maria",
     items: [
-      { nombre: "Ensalada", precio: 10000, estado: "entregado" }
+      { id: "i-3", nombre: "Ensalada", precio: 10000, estado: "entregado" }
     ],
     total: 10000,
     creadoEn: new Date().toISOString()
   }
 ];
 
-/** Calcula total sumando precios de items (siempre Number) */
+/* ------------------------------ Helpers ------------------------------ */
+
+/** Calcula total (suma de item.precio) */
 function calcTotal(items: Item[]) {
   return items.reduce((acc, item) => acc + (Number(item.precio) || 0), 0);
 }
 
+/** Generador de IDs simple y seguro cuando está disponible */
+function genId(prefix = ""): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return prefix + crypto.randomUUID();
+  }
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+/* ------------------------------ API del módulo ------------------------------ */
+
 /**
- * Devuelve la lista completa de pedidos (simula lectura desde DB).
- * Mantener async para que sea compatible con fetch/DB más adelante.
+ * getPedidos
+ * Devuelve la lista completa de pedidos.
+ * Mantengo async para compatibilidad futura con DB/fetch.
  */
 export async function getPedidos(): Promise<Pedido[]> {
   return PEDIDOS;
 }
 
-/** Devuelve un pedido o null si no existe */
+/**
+ * getPedidoById
+ * Retorna el pedido si existe, o null si no.
+ */
 export async function getPedidoById(id: string): Promise<Pedido | null> {
   return PEDIDOS.find(p => p.id === id) ?? null;
 }
 
 /**
- * Crea un nuevo pedido.
- * - data.items debe ser un array de Item (si falta, se normaliza a []).
- * - Si no envían total, lo calcula con calcTotal.
+ * createPedido
+ * - Normaliza items: si vienen sin item.id, asigna id nuevo.
+ * - Calcula total si no envían total.
+ * - Inserta pedido al inicio del array y devuelve el pedido creado.
+ *
+ * data.items puede ser Item[] (con o sin id). La función asegura ids únicos.
  */
 export async function createPedido(data: {
   mesa: string;
   mesero?: string;
-  items?: Item[];
+  items?: Partial<Omit<Item, "id">>[]; // permitimos items sin id (client puede enviar nombre/precio/nota/estado)
   total?: number;
 }): Promise<Pedido> {
-  const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : Date.now().toString();
+  const id = genId("p-");
 
-  const items = data.items ?? []; // garantizar array
+  // Normalizar items: asegurar id y campos correctos
+  const rawItems = data.items ?? [];
+  const items: Item[] = rawItems.map((it) => ({
+    id: genId("i-"),
+    nombre: String(it.nombre ?? "sin-nombre"),
+    precio: Number(it.precio ?? 0),
+    nota: it.nota ? String(it.nota) : undefined,
+    estado: (it as any).estado === "entregado" ? "entregado" : "pendiente"
+  }));
+
   const total = typeof data.total === "number" ? data.total : calcTotal(items);
 
   const nuevoPedido: Pedido = {
@@ -98,34 +132,44 @@ export async function createPedido(data: {
     creadoEn: new Date().toISOString()
   };
 
-  PEDIDOS.unshift(nuevoPedido); // agrega al inicio (más visible en las listas)
+  PEDIDOS.unshift(nuevoPedido); // agregar al inicio
   return nuevoPedido;
 }
+//con este creador de pedidos tenemos una seguridad robusta con los datos que llegan
+//siempre debemos controlar los datos que llegan del cliente
 
 /**
- * Actualiza el estado de un item dentro de un pedido (por índice).
- * - pedidoId: id del pedido
- * - itemIndex: índice dentro de pedido.items (0-based)
- * - nuevoEstado: nuevo estado (ej "entregado")
+ * updateItemEstadoById
+ * Actualiza el estado de un item dentro de un pedido buscando por itemId.
+ * Retorna el pedido actualizado o null si no encuentra pedido/item.
  *
- * Retorna el pedido actualizado o null si no se encontró pedido/item.
- *
- * Nota: usar índices funciona, pero es frágil si la UI reordena o elimina items.
- * Recomiendo más adelante añadir un `itemId` a Item y actualizar por id.
+ * Uso recomendado (más robusto que index-based): se puede llamar desde una ruta PATCH.
  */
-export async function updateItemEstado(
+export async function updateItemEstadoById(
   pedidoId: string,
-  itemIndex: number,
+  itemId: string,
   nuevoEstado: Estado
 ): Promise<Pedido | null> {
   const pedido = PEDIDOS.find(p => p.id === pedidoId);
   if (!pedido) return null;
-  if (!pedido.items || itemIndex < 0 || itemIndex >= pedido.items.length) return null;
 
-  pedido.items[itemIndex].estado = nuevoEstado;
-  // Si quisieras recalcular total (no es necesario aquí porque precio no cambia):
-  // pedido.total = calcTotal(pedido.items);
+  const item = pedido.items.find(it => it.id === itemId);
+  if (!item) return null;
 
+  item.estado = nuevoEstado;
+  // No recalculamos total porque precio no cambia; si modificaras precio, recalcular.
   return pedido;
 }
-//debe mejorar
+
+/* ------------------------------ Utilidades de debugging (opcionales) ------------------------------ */
+
+/** Borra todos los pedidos (dev) */
+export function _clearPedidosForDev() {
+  PEDIDOS.length = 0;
+}
+
+/** Reemplaza store con datos (dev) */
+export function _setPedidosForDev(data: Pedido[]) {
+  PEDIDOS.length = 0;
+  PEDIDOS.push(...data);
+}
