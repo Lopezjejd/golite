@@ -1,5 +1,5 @@
 import { Pedido,getPedidoById } from "@/lib/pedidos";
-
+import { notFound } from "next/navigation";
 
 // ⚠️ CORRECCIÓN CLAVE: El tipo de 'params' debe ser un objeto
 // cuya clave coincida con el nombre de tu carpeta dinámica (ej: [pedidoId])
@@ -13,6 +13,9 @@ export default async function PedidoPage({ params }: PedidoPageProps) {
     
 console.log('parametros',params)
 const pedidoTarget = await getPedidoById(pedidoId); 
+if (!pedidoTarget) {
+    notFound();
+}
 return (
     <div>
         <h1 className="text-2xl font-bold mb-4">Detalle del Pedido</h1>
@@ -20,7 +23,11 @@ return (
             <div>
                 <p>{pedidoTarget.mesa}</p>
                 <p>{pedidoTarget.total}</p>
-                <p>{pedidoTarget.estado}</p>
+                <ul>
+                    {pedidoTarget.items.map((it)=>{
+                        return <li key={it.id}>{it.nombre} ${it.precio} {it.nota && it.nota } <span className={it.estado === "pendiente" ?`text-red-600` : `text-green-500`}>{it.estado}</span></li>
+                    } )}
+                </ul>
             </div>
         ) : (
             <p>Pedido no encontrado</p>
