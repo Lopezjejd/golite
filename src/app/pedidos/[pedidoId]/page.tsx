@@ -1,6 +1,6 @@
 import { Pedido,getPedidoById } from "@/lib/pedidos";
 import { notFound } from "next/navigation";
-
+import { ItemPedido } from "@/components/ItemPedido";
 // ⚠️ CORRECCIÓN CLAVE: El tipo de 'params' debe ser un objeto
 // cuya clave coincida con el nombre de tu carpeta dinámica (ej: [pedidoId])
 interface PedidoPageProps {
@@ -25,7 +25,7 @@ return (
                 <p>{pedidoTarget.total}</p>
                 <ul>
                     {pedidoTarget.items.map((it)=>{
-                        return <li key={it.id}>{it.nombre} ${it.precio} {it.nota && it.nota } <span className={it.estado === "pendiente" ?`text-red-600` : `text-green-500`}>{it.estado}</span></li>
+                        return <ItemPedido key={it.id} item={it} pedidoId={pedidoTarget.id} />
                     } )}
                 </ul>
             </div>
