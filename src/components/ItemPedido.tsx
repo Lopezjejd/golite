@@ -11,7 +11,7 @@ export function ItemPedido({item,pedidoId}:ItemPedidoProps) {
     // Usamos useState para la interactividad (la razón de ser de un Client Component)
     // Inicialmente, el estado se toma de las props que vienen del Server Component
     const [estadoActual, setEstadoActual] = useState(item.estado);
-
+     //probando autosave
     // Función de ejemplo para cambiar el estado (simulación de una interacción)
     const handleToggleEstado = () => {
         const nuevoEstado: Estado = estadoActual === "pendiente" ? "entregado" : "pendiente";
