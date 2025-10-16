@@ -189,61 +189,29 @@ export async function crearNuevoPedido(formData: FormData): Promise<ActionRespon
  * 
  * @param formData - Datos del formulario con itemId y nuevo estado
  */
-export async function actualizarEstadoItem(formData: FormData): Promise<ActionResponse> {
+export async function actualizarEstadoItem(params: { pedidoId: string; itemId: string; estado: Estado }): Promise<ActionResponse> {
   "use server";
 
-  try {
-    const itemId = formData.get('itemId');
-    const pedidoId = formData.get('pedidoId');
-    const nuevoEstado = formData.get('estado');
+  const { pedidoId, itemId, estado } = params;
 
-    if (!itemId || !pedidoId || !nuevoEstado) {
-      return {
-        success: false,
-        message: "Faltan datos requeridos"
-      };
-    }
-
-    // Validar que el estado sea válido
-    if (nuevoEstado !== 'pendiente' && nuevoEstado !== 'entregado') {
-      return {
-        success: false,
-        message: "Estado inválido"
-      };
-    }
-
-    // Actualizar estado (asumiendo que tienes una función updateItemEstadoById)
-    const pedidoActualizado = await updateItemEstadoById(
-      String(pedidoId),
-      String(itemId),
-      nuevoEstado as Estado
-    );
-
-    if (!pedidoActualizado) {
-      return {
-        success: false,
-        message: "No se encontró el pedido o el ítem"
-      };
-    }
-
-    // Revalidar rutas afectadas
-    revalidatePath('/pedidos');
-    revalidatePath(`/pedidos/${String(pedidoId)}`);
-
-    return {
-      success: true,
-      pedido: pedidoActualizado
-    };
-
-  } catch (error) {
-    console.error('Error al actualizar estado:', error);
-    return {
-      success: false,
-      message: "Error al actualizar el estado del ítem"
-    };
+  if (!pedidoId || !itemId || !estado) {
+    return { success: false, message: "Faltan datos requeridos" };
   }
-}
 
+  if (estado !== "pendiente" && estado !== "entregado") {
+    return { success: false, message: "Estado inválido" };
+  }
+
+  const pedidoActualizado = await updateItemEstadoById(pedidoId, itemId, estado);
+  if (!pedidoActualizado) {
+    return { success: false, message: "No se encontró el pedido o el ítem" };
+  }
+
+  revalidatePath("/pedidos");
+  revalidatePath(`/pedidos/${pedidoId}`);
+
+  return { success: true, pedido: pedidoActualizado };
+}
 /**
  * Test manual 1: Crear nuevo pedido
  * 1. Navegar a /pedidos/nuevo

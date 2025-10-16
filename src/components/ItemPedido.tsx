@@ -2,25 +2,40 @@
 import { useState } from "react"
 
 import type { Item,Estado } from "@/lib/pedidos"
+import type {ActionResponse,ActualizarEstadoParams} from '@/types/pedidosType'
 
-interface ItemPedidoProps {
+interface itemPedidoProps {
     item: Item;
     pedidoId: string;
+    actualizarEstadoItem: (params: ActualizarEstadoParams) => Promise<ActionResponse>;
 }
-export function ItemPedido({item,pedidoId}:ItemPedidoProps) {
+
+export function ItemPedido({item,pedidoId,actualizarEstadoItem}: itemPedidoProps) {
     // Usamos useState para la interactividad (la razón de ser de un Client Component)
     // Inicialmente, el estado se toma de las props que vienen del Server Component
     const [estadoActual, setEstadoActual] = useState(item.estado);
+    const [loading,setLoading ] = useState(false);
      //probando autosave
     // Función de ejemplo para cambiar el estado (simulación de una interacción)
-    const handleToggleEstado = () => {
-        const nuevoEstado: Estado = estadoActual === "pendiente" ? "entregado" : "pendiente";
-        setEstadoActual(nuevoEstado);
-        
-        // ⚠️ NOTA: Aquí iría la lógica de MUTACIÓN SEGURA
-        // Esto sería un fetch POST/PATCH a una API Route o una Server Action
-        // para persistir el cambio en la base de datos.
-        console.log(`Intentando cambiar ítem ${item.id} del pedido ${pedidoId} a: ${nuevoEstado}`);
+    const  handleToggleEstado = async () => {
+if(estadoActual === 'entregado') return; //si ya esta entregado no hacer nada
+setLoading(true);
+try {
+    const res = await actualizarEstadoItem({ pedidoId, itemId: item.id, estado: 'entregado' })
+    if(!res.success){
+       alert(res.message || 'Error al actualizar estado');
+         return;
+    }
+    const updatedItem = res.pedido.items.find((it:any) => it.id === item.id);
+    setEstadoActual(updatedItem?.estado ?? "entregado");
+}catch (error) {
+    console.error('Error al actualizar estado:', error);
+    alert('Error al actualizar estado');
+} finally {
+    setLoading(false);
+}
+
+   
     };
 
     const estadoClase = estadoActual === "pendiente" ? 'text-red-600' : 'text-green-500';

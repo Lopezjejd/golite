@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPedidos } from "@/lib/pedidos";
 import PedidoCard from "@/components/PedidoCard";
+
 export default async function PedidosPage()  {
 const pedidos = await getPedidos(); // Asegúrate de que getPedidos es una función asíncrona que devuelve una promesa
 
@@ -11,7 +12,7 @@ return (
   <ul>
     {pedidos.map((pedido) => (
         <li key={pedido.id} className="mb-2">
-         <PedidoCard pedido={pedido} />
+         <PedidoCard pedido={pedido}  />
         </li>
     )
     )}
