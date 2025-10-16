@@ -1,6 +1,7 @@
 import { Pedido,getPedidoById } from "@/lib/pedidos";
 import { notFound } from "next/navigation";
 import { ItemPedido } from "@/components/ItemPedido";
+import { actualizarEstadoItem } from "@/lib/serverActions";
 // ⚠️ CORRECCIÓN CLAVE: El tipo de 'params' debe ser un objeto
 // cuya clave coincida con el nombre de tu carpeta dinámica (ej: [pedidoId])
 interface PedidoPageProps {
@@ -25,7 +26,7 @@ return (
                 <p>{pedidoTarget.total}</p>
                 <ul>
                     {pedidoTarget.items.map((it)=>{
-                        return <ItemPedido key={it.id} item={it} pedidoId={pedidoTarget.id} />
+                        return <ItemPedido key={it.id} item={it} pedidoId={pedidoTarget.id} actualizarEstadoItem={actualizarEstadoItem}/>
                     } )}
                 </ul>
             </div>
