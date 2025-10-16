@@ -1,6 +1,4 @@
-"use server";
-
-import { createPedido, Pedido, Item, Estado,updateItemEstadoById } from './pedidos';
+import { createPedido, Pedido, Item, Estado, updateItemEstadoById } from './pedidos';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -17,7 +15,6 @@ type ZodErrorCode =
   | "invalid_enum_value"
   | "invalid_arguments"
   | "invalid_return_type"
-  | "invalid_date"
   | "custom";
 
 /**
@@ -70,7 +67,7 @@ const PedidoInputSchema = z.object({
     .max(50, "Identificador de mesa demasiado largo"),
   mesero: z.string()
     .min(1, "Nombre del mesero requerido")
-    .max(100, "Nombre del mesero demasiado largo")
+    .max(20, "Nombre del mesero demasiado largo")
     .optional(),
   items: z.array(ItemSchema)
     .min(1, "Se requiere al menos un ítem en el pedido")
@@ -89,7 +86,6 @@ type PedidoInput = z.infer<typeof PedidoInputSchema>;
  */
 function parseFormData(formData: FormData): PedidoInput {
   try {
-    // Extraer y normalizar datos del FormData
     const rawData = {
       mesa: formData.get('mesa'),
       mesero: formData.get('mesero'),
@@ -98,8 +94,9 @@ function parseFormData(formData: FormData): PedidoInput {
     };
 
     return {
-      mesa: String(rawData.mesa || ''),
-      mesero: rawData.mesero ? String(rawData.mesero) : undefined,
+      mesa: String(rawData.mesa || '').trim(),
+      mesero: rawData.mesero ? String(rawData.mesero).trim() : undefined,
+      // Intentamos parsear items; si falla, lanzaremos para que el caller maneje y devuelva un error de validación
       items: JSON.parse(String(rawData.items || '[]')),
       total: rawData.total ? Number(rawData.total) : undefined
     };
@@ -136,87 +133,52 @@ type ActionResponse =
  * @param formData - Datos del formulario (puede venir de un form HTML o de un submit programático)
  * @returns Objeto con el resultado de la operación
  * 
- * @example
- * // Uso desde un Server Component:
- * <form action={crearNuevoPedido}>
- *   <input name="mesa" required />
- *   <input name="mesero" />
- *   <input name="items" type="hidden" value={JSON.stringify(items)} />
- * </form>
- * 
- * @example
- * // Uso desde un Client Component:
- * const formData = new FormData();
- * formData.append('mesa', mesa);
- * formData.append('items', JSON.stringify(items));
- * const result = await crearNuevoPedido(formData);
- * if (result.success) {
- *   // Pedido creado exitosamente
- *   console.log(result.pedido);
- * } else {
- *   // Manejar error
- *   console.error(result.message);
- * }
  */
 export async function crearNuevoPedido(formData: FormData): Promise<ActionResponse> {
+  "use server";
+
+  // Capturar errores de parseo y devolver un ActionResponse consistente
+  let rawData;
   try {
-    // 1. Parsear datos del formulario
-    const rawData = parseFormData(formData);
+    rawData = parseFormData(formData);
+  } catch (err) {
+    return {
+      success: false,
+      message: "Datos inválidos en el formulario",
+      errors: [
+        { code: "custom", message: err instanceof Error ? err.message : "Error al parsear datos", path: [] }
+      ]
+    };
+  }
 
-    // 2. Validar datos usando Zod
-    const validationResult = await PedidoInputSchema.safeParseAsync(rawData);
-    
-    if (!validationResult.success) {
-      return {
-        success: false,
-        message: "Datos inválidos en el formulario",
-        errors: validationResult.error.issues.map(issue => ({
-          code: mapZodErrorCode(issue.code),
-          message: issue.message,
-          path: issue.path.map(p => String(p))
-        }))
-      };
-    }
+  const validationResult = await PedidoInputSchema.safeParseAsync(rawData);
+  
+  if (!validationResult.success) {
+    return {
+      success: false,
+      message: "Datos inválidos en el formulario",
+      errors: validationResult.error.issues.map(issue => ({
+        code: mapZodErrorCode(String(issue.code)),
+        message: issue.message,
+        path: issue.path.map(p => String(p))
+      }))
+    };
+  }
 
-    // 3. Crear el pedido
+  try {
     const nuevoPedido = await createPedido(validationResult.data);
+    revalidatePath('/pedidos');
+    revalidatePath(`/pedidos/${String(nuevoPedido.id)}`); // Explicit String conversion
 
-    // 4. Revalidar caché de Next.js
-    revalidatePath('/pedidos'); // Ruta principal de pedidos
-    revalidatePath(`/pedidos/${nuevoPedido.id}`); // Ruta individual del pedido
-
-    // 5. Retornar éxito
     return {
       success: true,
       pedido: nuevoPedido
     };
-
   } catch (error) {
-    // 6. Manejo específico de errores
     console.error('Error al crear pedido:', error);
-    
-    if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        message: "Error de validación",
-        errors: error.issues.map(issue => ({
-          code: mapZodErrorCode(issue.code),
-          message: issue.message,
-          path: issue.path.map(p => String(p))
-        }))
-      };
-    }
-
-    if (error instanceof Error) {
-      return {
-        success: false,
-        message: error.message
-      };
-    }
-
-    // Error genérico
     return {
       success: false,
+      // Mensaje genérico al cliente; el detalle está en el log
       message: "Error interno al procesar el pedido"
     };
   }
@@ -228,6 +190,8 @@ export async function crearNuevoPedido(formData: FormData): Promise<ActionRespon
  * @param formData - Datos del formulario con itemId y nuevo estado
  */
 export async function actualizarEstadoItem(formData: FormData): Promise<ActionResponse> {
+  "use server";
+
   try {
     const itemId = formData.get('itemId');
     const pedidoId = formData.get('pedidoId');
@@ -264,7 +228,7 @@ export async function actualizarEstadoItem(formData: FormData): Promise<ActionRe
 
     // Revalidar rutas afectadas
     revalidatePath('/pedidos');
-    revalidatePath(`/pedidos/${pedidoId}`);
+    revalidatePath(`/pedidos/${String(pedidoId)}`);
 
     return {
       success: true,
@@ -279,3 +243,17 @@ export async function actualizarEstadoItem(formData: FormData): Promise<ActionRe
     };
   }
 }
+
+/**
+ * Test manual 1: Crear nuevo pedido
+ * 1. Navegar a /pedidos/nuevo
+ * 2. Llenar formulario con datos válidos
+ * 3. Submit form
+ * 4. Verificar que redirige a /pedidos y muestra el nuevo pedido
+ * 
+ * Test manual 2: Actualizar estado de item
+ * 1. En la lista de pedidos, encontrar un item pendiente
+ * 2. Click en "Marcar entregado"
+ * 3. Verificar que el estado cambia visualmente
+ * 4. Recargar página y confirmar persistencia
+ */
