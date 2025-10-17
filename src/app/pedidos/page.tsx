@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getPedidos } from "@/lib/pedidos";
 import { crearNuevoPedido } from "@/lib/serverActions";
 import PedidoCard from "@/components/PedidoCard";
-import ClientItemEditor from "@/components/ClientItemEditor";
+import CreatePedidoForm from "@/components/CreatePedidoForm";
 import { redirect } from "next/navigation";
 
 export default async function PedidosPage() {
@@ -38,16 +38,7 @@ return (
     )}
 
   </ul>
- <form action={action}>
-  <input type="text" name="mesa" required placeholder="nombre de mesa"
-  className="border-amber-500 rounded-2xl border-2 p-1 mb-2 w-full "
-   />
-  <input type="text" name="mesero" placeholder="nombre de mesero"
-  className="border-amber-500 rounded-2xl border-2 p-1 mb-2 w-full" />
-  <ClientItemEditor />
-  <button type="submit" className=" bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600
-    mt-2  ">crear</button>
- </form>
+ <CreatePedidoForm action={action} />
 </div>
 
 )
