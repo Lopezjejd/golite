@@ -37,29 +37,82 @@ export type Pedido = {
  * Datos de ejemplo para desarrollo.
  * En production reemplazar por una DB (Postgres, SQLite, Mongo, etc.)
  */
-const PEDIDOS: Pedido[] = [
-  {
-    id: "1",
-    mesa: "Mesa 1",
-    mesero: "Juan",
-    items: [
-      { id: "i-1", nombre: "Hamburguesa", precio: 12000, estado: "pendiente" },
-      { id: "i-2", nombre: "Papas fritas", precio: 8000, estado: "pendiente" }
-    ],
-    total: 20000,
-    creadoEn: new Date().toISOString()
-  },
-  {
-    id: "2",
-    mesa: "Mesa 2",
-    mesero: "Maria",
-    items: [
-      { id: "i-3", nombre: "Ensalada", precio: 10000, estado: "entregado" }
-    ],
-    total: 10000,
-    creadoEn: new Date().toISOString()
+/* ------------------------------ STORE en memoria (SINGLETON) ------------------------------ */
+
+class PedidosStore {
+  private static instance: PedidosStore;
+  private pedidos: Pedido[];
+
+  private constructor() {
+    // Datos iniciales - EXACTAMENTE igual que antes
+    this.pedidos = [
+      {
+        id: "1",
+        mesa: "Mesa 1",
+        mesero: "Juan",
+        items: [
+          { id: "i-1", nombre: "Hamburguesa", precio: 12000, estado: "pendiente" },
+          { id: "i-2", nombre: "Papas fritas", precio: 8000, estado: "pendiente" }
+        ],
+        total: 20000,
+        creadoEn: new Date().toISOString()
+      },
+      {
+        id: "2",
+        mesa: "Mesa 2",
+        mesero: "Maria",
+        items: [
+          { id: "i-3", nombre: "Ensalada", precio: 10000, estado: "entregado" }
+        ],
+        total: 10000,
+        creadoEn: new Date().toISOString()
+      }
+    ];
   }
-];
+
+  public static getInstance(): PedidosStore {
+    if (!PedidosStore.instance) {
+      PedidosStore.instance = new PedidosStore();
+    }
+    return PedidosStore.instance;
+  }
+
+  public getPedidos(): Pedido[] {
+    return this.pedidos;
+  }
+
+  public getPedidoById(id: string): Pedido | null {
+    return this.pedidos.find(pedido => pedido.id === id) || null;
+  }
+
+  public addPedido(pedido: Pedido): void {
+    this.pedidos.unshift(pedido); // agregar al inicio (igual que antes)
+  }
+
+  public updateItemEstado(pedidoId: string, itemId: string, nuevoEstado: Estado): boolean {
+    const pedido = this.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return false;
+
+    const item = pedido.items.find(it => it.id === itemId);
+    if (!item) return false;
+
+    item.estado = nuevoEstado;
+    return true;
+  }
+
+  // Para las funciones de debugging
+  public clearPedidos(): void {
+    this.pedidos.length = 0;
+  }
+
+  public setPedidos(data: Pedido[]): void {
+    this.pedidos.length = 0;
+    this.pedidos.push(...data);
+  }
+}
+
+// ✅ UNA sola instancia para toda la aplicación
+const pedidosStore = PedidosStore.getInstance();
 
 /* ------------------------------ Helpers ------------------------------ */
 
@@ -84,7 +137,7 @@ function genId(prefix = ""): string {
  * Mantengo async para compatibilidad futura con DB/fetch.
  */
 export async function getPedidos(): Promise<Pedido[]> {
-  return PEDIDOS;
+  return pedidosStore.getPedidos();
 }
 
 /**
@@ -92,7 +145,7 @@ export async function getPedidos(): Promise<Pedido[]> {
  * Retorna el pedido si existe, o null si no.
  */
 export async function getPedidoById(id: string): Promise<Pedido | null> {
-  return PEDIDOS.find(p => p.id === id) ?? null;
+  return pedidosStore.getPedidoById(id);
 }
 
 /**
@@ -132,7 +185,7 @@ export async function createPedido(data: {
     creadoEn: new Date().toISOString()
   };
 
-  PEDIDOS.unshift(nuevoPedido); // agregar al inicio
+  pedidosStore.addPedido(nuevoPedido);
   return nuevoPedido;
 }
 //con este creador de pedidos tenemos una seguridad robusta con los datos que llegan
@@ -150,7 +203,7 @@ export async function updateItemEstadoById(
   itemId: string,
   nuevoEstado: Estado
 ): Promise<Pedido | null> {
-  const pedido = PEDIDOS.find(p => p.id === pedidoId);
+  const pedido = pedidosStore.getPedidoById(pedidoId);
   if (!pedido) return null;
 
   const item = pedido.items.find(it => it.id === itemId);
@@ -165,11 +218,11 @@ export async function updateItemEstadoById(
 
 /** Borra todos los pedidos (dev) */
 export function _clearPedidosForDev() {
-  PEDIDOS.length = 0;
+  pedidosStore.clearPedidos();
 }
 
 /** Reemplaza store con datos (dev) */
 export function _setPedidosForDev(data: Pedido[]) {
-  PEDIDOS.length = 0;
-  PEDIDOS.push(...data);
+  pedidosStore.setPedidos(data);
+  
 }

@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 
 export default async function PedidosPage() {
   const pedidos = await getPedidos();
-
+  console.log('Pedidos obtenidos:', pedidos);
   async function action(formData: FormData) {
     "use server";
     try {

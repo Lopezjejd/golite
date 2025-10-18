@@ -1,39 +1,50 @@
-import { Pedido,getPedidoById } from "@/lib/pedidos";
+import { Pedido, getPedidoById, getPedidos } from "@/lib/pedidos";
 import { notFound } from "next/navigation";
 import { ItemPedido } from "@/components/ItemPedido";
 import { actualizarEstadoItem } from "@/lib/serverActions";
-// ⚠️ CORRECCIÓN CLAVE: El tipo de 'params' debe ser un objeto
-// cuya clave coincida con el nombre de tu carpeta dinámica (ej: [pedidoId])
+
+export const dynamic = 'force-dynamic';
+
 interface PedidoPageProps {
     params: {
-        pedidoId: string; // <-- La clave debe coincidir con el nombre del segmento [pedidoId]
+        pedidoId: string;
     };
 }
+
 export default async function PedidoPage({ params }: PedidoPageProps) {
-    const { pedidoId } = params; // Extraer el valor de pedidoId de params
+    const { pedidoId } = params;
     
-console.log('parametros',params)
-const pedidoTarget = await getPedidoById(pedidoId); 
-if (!pedidoTarget) {
-    notFound();
-}
-return (
-    <div>
-        <h1 className="text-2xl font-bold mb-4">Detalle del Pedido</h1>
-        {pedidoTarget ? (
+    console.log('🔍 Parámetros recibidos:', params);
+    
+    const pedidoTarget = await getPedidoById(pedidoId); 
+    const pedidosDisponibles = await getPedidos();
+    
+    console.log('📋 Pedidos disponibles en el sistema:', pedidosDisponibles.map(p => p.id));
+    
+    if (!pedidoTarget) {
+        console.log('❌ Pedido no encontrado. Disponibles:', pedidosDisponibles.map(p => p.id));
+        notFound(); // ⚠️ Esto detiene la ejecución - nada después se ejecuta
+    }
+    
+    // ✅ Este código solo se ejecuta si el pedido SÍ existe
+    return (
+        <div>
+            <h1 className="text-2xl font-bold mb-4">Detalle del Pedido</h1>
             <div>
-                <p>{pedidoTarget.mesa}</p>
-                <p>{pedidoTarget.total}</p>
+                <p><strong>Mesa:</strong> {pedidoTarget.mesa}</p>
+                <p><strong>Total:</strong> ${pedidoTarget.total}</p>
+                <h2 className="text-lg font-semibold mt-4">Items:</h2>
                 <ul>
-                    {pedidoTarget.items.map((it)=>{
-                        return <ItemPedido key={it.id} item={it} pedidoId={pedidoTarget.id} actualizarEstadoItem={actualizarEstadoItem}/>
-                    } )}
+                    {pedidoTarget.items.map((it) => (
+                        <ItemPedido 
+                            key={it.id} 
+                            item={it} 
+                            pedidoId={pedidoTarget.id} 
+                            actualizarEstadoItem={actualizarEstadoItem}
+                        />
+                    ))}
                 </ul>
             </div>
-        ) : (
-            <p>Pedido no encontrado</p>
-        )}
-
-    </div>
-)
+        </div>
+    );
 }
