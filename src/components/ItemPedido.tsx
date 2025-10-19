@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react"
-
+import { useState,useEffect,useTransition } from "react"
+import { useRouter } from "next/navigation";
 import type { Item,Estado } from "@/lib/pedidos"
 import type {ActionResponse,ActualizarEstadoParams} from '@/types/pedidosType'
 
@@ -14,7 +14,12 @@ export function ItemPedido({item,pedidoId,actualizarEstadoItem}: itemPedidoProps
     // Usamos useState para la interactividad (la razón de ser de un Client Component)
     // Inicialmente, el estado se toma de las props que vienen del Server Component
     const [estadoActual, setEstadoActual] = useState(item.estado);
+    useEffect(() => {
+        setEstadoActual(item.estado);
+    }, [item.estado]);// Asegura que si el item cambia, el estado se actualice
     const [loading,setLoading ] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const router = useRouter();
      //probando autosave
     // Función de ejemplo para cambiar el estado (simulación de una interacción)
     const  handleToggleEstado = async () => {
@@ -26,8 +31,10 @@ try {
        alert(res.message || 'Error al actualizar estado');
          return;
     }
-    const updatedItem = res.pedido.items.find((it:any) => it.id === item.id);
-    setEstadoActual(updatedItem?.estado ?? "entregado");
+
+    startTransition(()=> {
+        router.refresh();
+    });
 }catch (error) {
     console.error('Error al actualizar estado:', error);
     alert('Error al actualizar estado');
@@ -56,12 +63,15 @@ try {
                 </span>
                 
                 {/* Botón de Interacción (Ejemplo de por qué necesita ser un CC) */}
-                <button
-                    onClick={handleToggleEstado}
-                    className="ml-4 px-3 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600"
-                >
-                    {estadoActual === "pendiente" ? "Marcar Entregado" : "Marcar Pendiente"}
-                </button>
+          <button
+  onClick={handleToggleEstado}
+  disabled={loading || isPending || estadoActual === "entregado"}
+  aria-label={estadoActual === "entregado" ? "Item entregado" : "Marcar como entregado"}
+  className={`ml-4 px-3 py-1 text-xs text-white rounded ${estadoActual === "entregado" ? "bg-gray-400 opacity-50 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"}`}
+>
+  {loading || isPending ? "..." : (estadoActual === "pendiente" ? "Entregar" : "Pedido entregado")}
+</button>
+
             </div>
         </li>
     );
